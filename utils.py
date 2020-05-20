@@ -1,3 +1,5 @@
+import tqdm
+
 def ngrams(s, r, pad=False):
     """
     Takes a list as input and returns all n-grams up to a certain range.
@@ -46,5 +48,15 @@ def read_train_data(path):
             else:
                 word, pos, chunk = line.split()
                 words.append(word)
-                tags.append(pos)
+                tags.append(chunk)
     return sentences, targets
+
+def test_accuracy(model, sentences, targets):
+    num_tokens = 0
+    correct = 0
+    for i, s in tqdm.tqdm(enumerate(sentences)):
+        tags = model.predict(s)
+        for j, t in enumerate(tags):
+            num_tokens += 1.0
+            correct += int(targets[i][j] == t)
+    print(correct / num_tokens)

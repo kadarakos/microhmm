@@ -3,15 +3,15 @@ Hints from https://web.stanford.edu/~jurafsky/slp3/8.pdf
 """
 
 import math
-import time
 import numpy
 from utils import read_train_data
 from utils import ngrams
-import tqdm
+from utils import test_accuracy
 
 class HMM:
-    def __init__(self, unk_freq=1):
+    def __init__(self, handle_unks=True, unk_freq=1):
 
+        self.handle_unks = handle_unks
         self.unk_freq = unk_freq
         self.sentences = []
         self.targets = []
@@ -83,7 +83,7 @@ class HMM:
                 self.pos_unigram_probs[t] = self.pos_unigram_counts[t] / Z
         return self.emission_probs, self.transition_probs
 
-    def viterbi(self, S):
+    def predict(self, S):
         """
         Viterbi decoding for a single example.
         Given a tokenized sentence S, return tag sequence
@@ -95,7 +95,10 @@ class HMM:
         T = numpy.zeros((len(S), len(self.tags))) - numpy.inf
         backpointers = numpy.zeros((len(S), len(self.tags)))
         # Initialize with log(P(w_1|t_i)) + log(P(t_i|START))
-        w1 = S[0] if S[0] in self.word_counts else "<UNK>"
+        if self.handle_unks:
+            w1 = S[0] if S[0] in self.word_counts else "<UNK>"
+        else:
+            w1 = S[0]
         for i, tag in enumerate(self.tags):
             pw1_ti = self.emission_probs.get((w1, tag), 1e-8)
             pti_tim1 = self.transition_probs.get(('<START>', tag), 1e-8)
@@ -104,7 +107,10 @@ class HMM:
         for i in range(1, len(S)):
             # For each current tag.
             for t in range(len(self.tags)):
-                w = S[i] if S[i] in self.word_counts else "<UNK>"
+                if self.handle_unks:
+                    w = S[i] if S[i] in self.word_counts else "<UNK>"
+                else:
+                    w = S[i]
                 # P(w_i|t_i)
                 pw_ti = self.emission_probs.get((w, self.tags[t]), 1e-8)
                 # For each previous tag.
@@ -130,7 +136,8 @@ class HMM:
         # Get word-counts in the training set
         self.get_word_counts(sentences)
         # Use counts to replace infrequent words with UNK
-        self.replace_UNK(sentences, self.unk_freq)
+        if self.handle_unks:
+            self.replace_UNK(sentences, self.unk_freq)
         # Get counts to compute transition and emission probs later
         self.compute_counts(sentences, targets)
         # Compute P(w|t) and P(ti|ti-1)
@@ -138,18 +145,9 @@ class HMM:
         self.tags = list(self.pos_unigram_counts.keys())
         self.tags.remove("<START>")
 
-train_sentences, train_targets = read_train_data('train.txt')
-test_sentences, test_targets = read_train_data('test.txt')
-hmm = HMM(unk_freq=1)
-hmm.train(train_sentences, train_targets)
-print(hmm.viterbi("Laura does not have an example".split()))
-num_tokens = 0
-correct = 0
-
-# Compute accuracy on the test set
-#for i, s in tqdm.tqdm(enumerate(test_sentences)):
-#    tags = hmm.viterbi(s)
-#    for j, t in enumerate(tags):
-#        num_tokens += 1.0
-#        correct += int(test_targets[i][j] == t)
-#print(correct/num_tokens)
+if __name__ == "__main__":
+    train_sentences, train_targets = read_train_data('train.txt')
+    test_sentences, test_targets = read_train_data('test.txt')
+    hmm = HMM(unk_freq=1)
+    hmm.train(train_sentences, train_targets)
+    test_accuracy(hmm, test_sentences, test_targets)
